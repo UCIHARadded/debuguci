@@ -45,18 +45,17 @@ def get_act_dataloader(args):
             if args.dataset == 'uci_har':
                 return uci_loader.get_uci_har_dataloader(args)
 
-    rate = 0.2
-    args.steps_per_epoch = int(args.steps_per_epoch*(1-rate))
-    tdata = combindataset(args, source_datasetlist)
-    l = len(tdata.labels)
-    indexall = np.arange(l)
-    np.random.seed(args.seed)
-    np.random.shuffle(indexall)
-    ted = int(l*rate)
-    indextr, indexval = indexall[ted:], indexall[:ted]
-    tr = subdataset(args, tdata, indextr)
-    val = subdataset(args, tdata, indexval)
-    targetdata = combindataset(args, target_datalist)
+    # Hold out one source environment for validation
+    val_env_idx = 0  # Or choose dynamically, e.g., args.val_env
+    source_envs_train = [env for i, env in enumerate(source_datasetlist) if i != val_env_idx]
+    val_env = source_datasetlist[val_env_idx]
+    
+    tr = combindataset(args, source_envs_train)  # Training = other source environments
+    val = val_env  # Validation = held-out source environment
+    targetdata = combindataset(args, target_datalist)  # Target = test environments
+    
+    # Update steps_per_epoch (optional, adjust if needed)
+    args.steps_per_epoch = len(tr) // args.batch_size
     train_loader, train_loader_noshuffle, valid_loader, target_loader = get_dataloader(
         args, tr, val, targetdata)
     return train_loader, train_loader_noshuffle, valid_loader, target_loader, tr, val, targetdata
